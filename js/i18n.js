@@ -33,7 +33,7 @@ const I18N = {
     "dashboard.empty": "No entries yet",
     "dashboard.emptyHint": "Add your first payment to see weekly totals here.",
     "dashboard.emptyCta": "Add a payment",
-    "dashboard.clients": "Clients",
+    "dashboard.clients": "Photographer",
     "dashboard.clientsEmpty": "No clients this week.",
 
     "data.eyebrow": "All entries",
@@ -183,7 +183,7 @@ const I18N = {
     "dashboard.empty": "Hen\u00fcz kay\u0131t yok",
     "dashboard.emptyHint": "Haftal\u0131k toplamlar\u0131 g\u00f6rmek i\u00e7in ilk \u00f6demenizi ekleyin.",
     "dashboard.emptyCta": "\u00d6deme ekle",
-    "dashboard.clients": "M\u00fc\u015fteriler",
+    "dashboard.clients": "Fotoğrafçı",
     "dashboard.clientsEmpty": "Bu hafta m\u00fc\u015fteri yok.",
 
     "data.eyebrow": "T\u00fcm kay\u0131tlar",
