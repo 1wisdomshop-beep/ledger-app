@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>Ledger</title>
+
+<!-- PWA / mobile home-screen support -->
+<meta name="theme-color" content="#2f9e6e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Ledger">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="tabbar" id="tabbar" aria-label="Sections">
+    <button class="tab" data-view="submission" type="button">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span data-i18n="nav.submission">Add</span>
+    </button>
+    <button class="tab" data-view="dashboard" type="button">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+      <span data-i18n="nav.dashboard">Dashboard</span>
+    </button>
+    <button class="tab" data-view="data" type="button">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg>
+      <span data-i18n="nav.data">Data</span>
+    </button>
+  </nav>
+
+  <div class="lang-switch" id="lang-switch" role="group" aria-label="Language">
+    <button class="lang-option" data-lang="en" type="button">EN</button>
+    <button class="lang-option" data-lang="ru" type="button">RU</button>
+    <button class="lang-option" data-lang="tr" type="button">TR</button>
+  </div>
+
+  <main id="app">
+
+    <!-- ===================== SUBMISSION VIEW ===================== -->
+    <section id="view-submission" class="view is-active">
+      <div class="card">
+        <span class="eyebrow" data-i18n="submission.eyebrow">New entry</span>
+        <h1 data-i18n="submission.title">Add a payment</h1>
+        <p class="rates-note mono" id="rates-note">&nbsp;</p>
+
+        <form id="entry-form" novalidate>
+          <label class="field">
+            <span class="field-label" data-i18n="submission.client">Client name</span>
+            <input type="text" id="client-name" name="client_name" autocomplete="off" required>
+          </label>
+
+          <div class="field">
+            <span class="field-label" data-i18n="submission.date">Date</span>
+            <div class="date-stepper">
+              <button type="button" id="date-prev" class="date-arrow" aria-label="Previous day">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+              </button>
+              <div class="date-display mono" id="date-display">—</div>
+              <button type="button" id="date-next" class="date-arrow" aria-label="Next day" disabled>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+              <button type="button" id="date-calendar-btn" class="date-calendar-btn" aria-label="Pick a date">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>
+                </svg>
+              </button>
+              <input type="date" id="date-native-input" class="date-native-input" tabindex="-1" aria-hidden="true">
+            </div>
+          </div>
+
+          <div class="field-label row-label" data-i18n="submission.amounts">Amounts</div>
+          <div id="currency-rows" class="currency-rows"></div>
+
+          <button type="button" id="add-currency-btn" class="btn-add">
+            <span class="plus" aria-hidden="true">+</span>
+            <span data-i18n="submission.addCurrency">Add currency</span>
+          </button>
+
+          <button type="submit" class="btn-primary" id="submit-btn">
+            <span class="btn-label" data-i18n="submission.submit">Submit</span>
+            <span class="spinner" aria-hidden="true"></span>
+          </button>
+
+          <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===================== DASHBOARD VIEW ===================== -->
+    <section id="view-dashboard" class="view">
+      <span class="eyebrow" data-i18n="dashboard.eyebrow">Weekly totals</span>
+      <h1 data-i18n="dashboard.title">Dashboard</h1>
+      <div class="weeks-list" id="weeks-list"></div>
+    </section>
+
+    <!-- ===================== DATA VIEW ===================== -->
+    <section id="view-data" class="view view-wide">
+      <div class="data-header">
+        <div>
+          <span class="eyebrow" data-i18n="data.eyebrow">All entries</span>
+          <h1 data-i18n="data.title">Data</h1>
+        </div>
+        <div class="data-actions">
+          <button type="button" class="btn-chip" id="add-row-btn" data-i18n="data.addRow">Add row</button>
+          <button type="button" class="btn-chip" id="export-entries-btn" data-i18n="data.exportEntriesCsv">Export entries CSV</button>
+          <button type="button" class="btn-chip" id="export-backup-btn" data-i18n="data.exportBackup">Export backup (.sqlite)</button>
+          <label class="btn-chip btn-chip-file">
+            <span data-i18n="data.importBackup">Import backup</span>
+            <input type="file" id="import-backup-input" accept=".sqlite,.db,.sqlite3,application/x-sqlite3,application/vnd.sqlite3,application/octet-stream" hidden>
+          </label>
+        </div>
+      </div>
+
+      <div class="entries-groups" id="entries-groups"></div>
+      <p class="dashboard-status" id="entries-groups-empty" data-i18n="data.empty" hidden></p>
+
+      <div class="rates-panel">
+        <div class="rates-panel-header">
+          <span class="eyebrow" data-i18n="data.ratesTitle">Exchange rates</span>
+          <button type="button" class="btn-chip" id="export-rates-btn" data-i18n="data.exportRatesCsv">Export rates CSV</button>
+        </div>
+        <table class="data-grid rates-grid" id="rates-grid">
+          <tbody id="rates-grid-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+  <div id="chart-tooltip" class="chart-tooltip" role="tooltip"></div>
+
+  <!-- Entry details popup: name / amounts / created timestamp / edit history -->
+  <div id="entry-modal-overlay" class="modal-overlay" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="entry-modal-title">
+      <div class="modal-header">
+        <h2 id="entry-modal-title" data-i18n="modal.title">Entry details</h2>
+        <button type="button" class="modal-close" id="entry-modal-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-row">
+          <span class="modal-label" data-i18n="modal.client">Client</span>
+          <span class="modal-value" id="modal-client"></span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label" data-i18n="submission.date">Date</span>
+          <span class="modal-value mono" id="modal-date"></span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label" data-i18n="submission.amounts">Amounts</span>
+          <span class="modal-value mono" id="modal-amounts"></span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label" data-i18n="modal.totalUsd">Total (USD)</span>
+          <span class="modal-value mono" id="modal-total"></span>
+        </div>
+        <div class="modal-row">
+          <span class="modal-label" data-i18n="modal.created">Created</span>
+          <span class="modal-value mono" id="modal-created"></span>
+        </div>
+        <div class="modal-history">
+          <span class="modal-label" data-i18n="modal.history">Change history</span>
+          <ul class="modal-history-list" id="modal-history-list"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/vendor/sql-wasm-binary.js"></script>
+  <script src="js/vendor/sql-wasm.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // Registering the service worker is what lets the app be added to the
+    // home screen and keep working offline after the first visit. It's a
+    // pure enhancement: if it fails (unsupported browser, opened via
+    // file://, etc.) the app still runs exactly as it does today.
+    if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
