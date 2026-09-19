@@ -68,12 +68,24 @@
               <button type="button" id="date-next" class="date-arrow" aria-label="Next day" disabled>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
               </button>
-              <button type="button" id="date-calendar-btn" class="date-calendar-btn" aria-label="Pick a date">
-                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>
-                </svg>
-              </button>
-              <input type="date" id="date-native-input" class="date-native-input" tabindex="-1" aria-hidden="true">
+              <div class="date-calendar-wrap">
+                <span class="date-calendar-btn" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>
+                  </svg>
+                </span>
+                <!--
+                  This real <input type="date"> sits invisibly on top of the
+                  icon above (see .date-native-input) and IS the tap target.
+                  Opening a date picker only via JS (showPicker()/click() on a
+                  hidden input from a separate button's click handler) is
+                  unreliable on Android Chrome. A direct tap on the real,
+                  correctly-sized input is the one mechanism guaranteed to
+                  open the native picker on every browser that supports
+                  type="date" at all, with no JS involved.
+                -->
+                <input type="date" id="date-native-input" class="date-native-input" aria-label="Pick a date">
+              </div>
             </div>
           </div>
 
