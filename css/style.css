@@ -222,7 +222,7 @@ input:focus, select:focus {
   border-radius: var(--radius-sm);
   padding: 0.35rem;
 }
-.date-arrow, .date-calendar-btn {
+.date-arrow {
   width: 34px;
   height: 34px;
   display: grid;
@@ -234,7 +234,7 @@ input:focus, select:focus {
   cursor: pointer;
   transition: background 0.2s var(--ease), color 0.2s var(--ease);
 }
-.date-arrow:hover, .date-calendar-btn:hover { background: var(--green-light); color: var(--green-dark); }
+.date-arrow:hover { background: var(--green-light); color: var(--green-dark); }
 .date-arrow[disabled] { opacity: 0.3; cursor: not-allowed; }
 .date-arrow[disabled]:hover { background: transparent; color: var(--ink-muted); }
 .date-display {
@@ -244,11 +244,38 @@ input:focus, select:focus {
   color: var(--ink);
   user-select: none;
 }
+/* Calendar trigger: a decorative icon with the *real* date input
+   stacked exactly on top of it (see .date-native-input below). The
+   input, not JS, is what the user actually taps. */
+.date-calendar-wrap {
+  position: relative;
+  width: 34px;
+  height: 34px;
+}
+.date-calendar-btn {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--ink-muted);
+  pointer-events: none; /* purely visual; the input above it gets all taps */
+  transition: background 0.2s var(--ease), color 0.2s var(--ease);
+}
+.date-calendar-wrap:hover .date-calendar-btn,
+.date-calendar-wrap:focus-within .date-calendar-btn {
+  background: var(--green-light);
+  color: var(--green-dark);
+}
 .date-native-input {
   position: absolute;
-  width: 1px; height: 1px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
   opacity: 0;
-  pointer-events: none;
+  cursor: pointer;
 }
 
 .currency-rows { display: flex; flex-direction: column; gap: 0.55rem; margin-bottom: 0.8rem; }
@@ -888,7 +915,7 @@ input:focus, select:focus {
   }
 
   /* Bigger tap targets throughout. */
-  .date-arrow, .date-calendar-btn { width: 42px; height: 42px; }
+  .date-arrow, .date-calendar-wrap { width: 42px; height: 42px; }
   .remove-row-btn { width: 42px; height: 42px; }
   .row-edit-btn { width: 34px; height: 34px; }
   .row-save-btn, .row-delete-btn { width: 38px; height: 38px; }
