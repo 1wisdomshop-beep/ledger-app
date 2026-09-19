@@ -120,7 +120,19 @@ const DB = (function () {
     sql = await initSqlJs({ wasmBinary: binary.buffer });
 
     const saved = await idbLoad();
-    db = saved ? new sql.Database(new Uint8Array(saved)) : new sql.Database();
+    db = null;
+    if (saved) {
+      try {
+        db = new sql.Database(new Uint8Array(saved));
+        db.exec("PRAGMA schema_version"); // touch it: proves the bytes are a real, readable database
+      } catch (e) {
+        // The saved snapshot is corrupted (e.g. the tab was killed mid-write).
+        // A blank-but-working app beats one that's permanently stuck.
+        if (db) { try { db.close(); } catch (_) {} }
+        db = null;
+      }
+    }
+    if (!db) db = new sql.Database();
     db.run(SCHEMA_SQL);
     seedRatesIfEmpty();
     await persist();
@@ -385,6 +397,19 @@ const DB = (function () {
   }
 
   // -----------------------------------------------------------
+  // Filename timestamps -- every export gets one so repeated backups
+  // never silently overwrite an earlier one (in the Downloads folder,
+  // or on the receiving end of a share-sheet send). Uses the device's
+  // local time, since that's what the export date means to the person
+  // making the backup. Colons are avoided (invalid in Windows filenames).
+  // -----------------------------------------------------------
+  function timestampForFilename() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  }
+
+  // -----------------------------------------------------------
   // CSV export
   // -----------------------------------------------------------
   function toCsv(rows, columns) {
@@ -404,11 +429,11 @@ const DB = (function () {
       "amount_tl", "amount_transferred_tl", "converted_total_usd", "week_start_date", "created_at",
     ];
     const blob = new Blob([toCsv(rows, cols)], { type: "text/csv;charset=utf-8" });
-    return shareOrDownload("entries.csv", blob, meta);
+    return shareOrDownload(`entries-${timestampForFilename()}.csv`, blob, meta);
   }
   async function exportRatesCsv(meta) {
     const blob = new Blob([toCsv(listRates(), ["currency_code", "rate_to_usd"])], { type: "text/csv;charset=utf-8" });
-    return shareOrDownload("rates.csv", blob, meta);
+    return shareOrDownload(`rates-${timestampForFilename()}.csv`, blob, meta);
   }
 
   // -----------------------------------------------------------
@@ -427,10 +452,46 @@ const DB = (function () {
   async function exportSqliteFile(meta) {
     const bytes = db.export();
     const blob = new Blob([bytes], { type: "application/x-sqlite3" });
-    return shareOrDownload("ledger-backup.sqlite", blob, meta);
+    return shareOrDownload(`backup-${timestampForFilename()}.sqlite`, blob, meta);
+  }
+
+  // A generous cap: a real ledger backup is a handful of MB at most, even
+  // with years of entries and full edit history. Rejecting anything wildly
+  // larger up front (before it's even parsed) means an accidental wrong
+  // file (a video, a photo) fails instantly with a clear message instead
+  // of the tab grinding through allocating a huge WASM heap for it.
+  const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
+
+  // Beyond "is this a readable SQLite file at all", make sure it's
+  // actually THIS app's schema. Without this, a valid-but-unrelated
+  // .sqlite file (or a much older backup with a differently-shaped
+  // entries table) could be accepted, only to throw later -- repeatedly,
+  // on every render -- the moment the app tries to query a column that
+  // isn't there. Failing loudly now, before switching over, is much
+  // safer than failing silently (and repeatedly) after.
+  function assertLedgerSchema(candidate) {
+    const tables = candidate.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='entries'");
+    const hasEntries = tables.length > 0 && tables[0].values.length > 0;
+    if (!hasEntries) return; // empty/fresh database -- SCHEMA_SQL below will create everything
+
+    const info = candidate.exec("PRAGMA table_info(entries)");
+    const columns = info.length ? info[0].values.map((row) => row[1]) : [];
+    const required = ["entry_date", "client_name", "amount_usd", "amount_eur", "amount_rub", "amount_tl", "amount_transferred_tl"];
+    const missing = required.filter((c) => !columns.includes(c));
+    if (missing.length) {
+      const err = new Error("This file's structure doesn't match a ledger backup");
+      err.code = "SCHEMA_MISMATCH";
+      throw err;
+    }
   }
 
   async function importSqliteFile(arrayBuffer) {
+    if (arrayBuffer && arrayBuffer.byteLength > MAX_IMPORT_BYTES) {
+      const err = new Error("File is too large to be a ledger backup");
+      err.code = "FILE_TOO_LARGE";
+      throw err;
+    }
+
     const bytes = new Uint8Array(arrayBuffer);
     if (!looksLikeSqliteFile(bytes)) {
       const err = new Error("Not a valid .sqlite file");
@@ -438,21 +499,36 @@ const DB = (function () {
       throw err;
     }
 
-    let next;
+    let next = null;
     try {
       next = new sql.Database(bytes);
       // Touch the database so a file with the right magic bytes but garbage
       // contents past the header still fails here, inside the try block.
       next.exec("PRAGMA schema_version");
+      assertLedgerSchema(next);
     } catch (e) {
-      const err = new Error("Not a valid .sqlite file");
-      err.code = "INVALID_SQLITE_FILE";
+      if (next) { try { next.close(); } catch (_) {} } // free the WASM-side handle; don't leak it
+      const err = new Error(e && e.message ? e.message : "Not a valid .sqlite file");
+      err.code = (e && e.code) || "INVALID_SQLITE_FILE";
       throw err;
     }
 
-    db = next;
-    db.run(SCHEMA_SQL); // no-op for tables/view already present, adds any that are missing
-    await persist();
+    const previous = db;
+    try {
+      db = next;
+      db.run(SCHEMA_SQL); // no-op for tables/view already present, adds any that are missing
+      await persist();
+    } catch (e) {
+      // Something went wrong finishing the swap (e.g. IndexedDB write
+      // failure) -- roll back to the last known-good database rather than
+      // leaving the app on a half-imported one.
+      db = previous;
+      if (next) { try { next.close(); } catch (_) {} }
+      const err = new Error("Could not finish importing this backup");
+      err.code = "IMPORT_FAILED";
+      throw err;
+    }
+    if (previous && previous !== db) { try { previous.close(); } catch (_) {} }
   }
 
   return {
