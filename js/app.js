@@ -55,7 +55,6 @@
     datePrev: document.getElementById("date-prev"),
     dateNext: document.getElementById("date-next"),
     dateDisplay: document.getElementById("date-display"),
-    dateCalendarBtn: document.getElementById("date-calendar-btn"),
     dateNativeInput: document.getElementById("date-native-input"),
     currencyRows: document.getElementById("currency-rows"),
     addCurrencyBtn: document.getElementById("add-currency-btn"),
@@ -158,10 +157,6 @@
   }
   el.datePrev.addEventListener("click", () => shiftDate(-1));
   el.dateNext.addEventListener("click", () => shiftDate(1));
-  el.dateCalendarBtn.addEventListener("click", () => {
-    if (el.dateNativeInput.showPicker) el.dateNativeInput.showPicker();
-    else el.dateNativeInput.click();
-  });
   el.dateNativeInput.addEventListener("change", () => {
     if (!el.dateNativeInput.value) return;
     const [y, m, d] = el.dateNativeInput.value.split("-").map(Number);
@@ -286,6 +281,27 @@
     state.selectedDate = startOfDay(new Date());
     renderDateDisplay();
   }
+
+  // Enter on the client name field feels like "next field", not "submit":
+  // move focus to the first amount input instead of letting the browser's
+  // implicit form-submit-on-Enter behaviour fire.
+  el.clientName.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const firstAmount = el.currencyRows.querySelector(".amount-input");
+    if (firstAmount) firstAmount.focus();
+  });
+
+  // Enter on an amount field should just close the on-screen keyboard, not
+  // submit the form (a currency row's amount is often the last focusable
+  // field, so the browser's default behaviour would otherwise submit
+  // immediately, even with other rows still empty). Delegated on the
+  // container so it covers every currency row added later, too.
+  el.currencyRows.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || !e.target.classList.contains("amount-input")) return;
+    e.preventDefault();
+    e.target.blur();
+  });
 
   el.form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -908,9 +924,27 @@
   el.exportRatesBtn.addEventListener("click", () => handleExport(DB.exportRatesCsv));
   el.exportBackupBtn.addEventListener("click", () => handleExport(DB.exportSqliteFile));
 
+  const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
+  const IMPORT_ERROR_MESSAGES = {
+    INVALID_SQLITE_FILE: "data.importInvalid",
+    SCHEMA_MISMATCH: "data.importSchemaMismatch",
+    FILE_TOO_LARGE: "data.importTooLarge",
+    IMPORT_FAILED: "data.importInvalid",
+  };
   el.importBackupInput.addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Check the size up front, before ever reading the file into memory --
+    // an accidental wrong pick (a video, a photo) fails instantly instead
+    // of the tab stalling while it reads a huge file for nothing.
+    if (file.size > MAX_IMPORT_BYTES) {
+      showToast(t("data.importTooLarge"), "error");
+      e.target.value = "";
+      return;
+    }
+
+    showToast(t("data.importReading"));
     try {
       const buffer = await file.arrayBuffer();
       await DB.importSqliteFile(buffer);
@@ -919,8 +953,8 @@
       renderRatesGrid();
       renderRatesNote();
     } catch (err) {
-      const message = err && err.code === "INVALID_SQLITE_FILE" ? t("data.importInvalid") : err.message || "Error";
-      showToast(message, "error");
+      const key = err && IMPORT_ERROR_MESSAGES[err.code];
+      showToast(key ? t(key) : err.message || t("data.importInvalid"), "error");
     } finally {
       e.target.value = "";
     }
@@ -930,7 +964,15 @@
   // Init
   // -------------------------------------------------------------
   (async function boot() {
-    await DB.init();
+    try {
+      await DB.init();
+    } catch (err) {
+      document.body.innerHTML =
+        '<div style="max-width:26rem;margin:3rem auto;padding:1.5rem;font:15px/1.5 system-ui,sans-serif;text-align:center;color:#444;">' +
+        "Couldn't start the app. Please reload the page. If this keeps happening, exporting/reinstalling may help." +
+        "</div>";
+      return;
+    }
     addCurrencyRow();
     applyStaticTranslations();
     renderRatesNote();
